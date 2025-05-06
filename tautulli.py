@@ -16,8 +16,9 @@ def get_tautulli_data(cmd, **params):
     return resp.json()
 
 
-def get_recently_watched_movies(user_id=None, username="peterg236", limit=10):
+def get_recently_watched(user_id=None, username="peterg236", limit=10, media_type="movie"):
     """
+    media_type: one of 'movie' or 'episode' (for show)
     Returns a DataFrame of the user's most recently watched movies (title, watched_at).
     """
     # 1) Resolve user_id if not provided
@@ -33,8 +34,8 @@ def get_recently_watched_movies(user_id=None, username="peterg236", limit=10):
     resp = get_tautulli_data(
         "get_history",
         user_id=user_id,
-        media_type="movie",
-        length=limit,
+        media_type=media_type,
+        # length=limit,
         order_column="date",
         order_dir="desc"
     )
@@ -56,7 +57,10 @@ def get_recently_watched_movies(user_id=None, username="peterg236", limit=10):
             watched_at = datetime.fromtimestamp(int(ts))
         except Exception:
             watched_at = None
-        title = entry.get("title") or entry.get("full_title")
+        if (media_type == "movie"):
+            title = entry.get("title") or entry.get("full_title")
+        else:
+            title = entry.get("grandparent_title")
         records.append({
             "title": title,
             "watched_at": watched_at
@@ -64,9 +68,15 @@ def get_recently_watched_movies(user_id=None, username="peterg236", limit=10):
 
     # 4) Return DataFrame of the most recent N
     df = pd.DataFrame(records)
-    return df.head(limit)
+    recent_shows = (
+        df.groupby("title", as_index=False)["watched_at"]
+        .max()
+        .sort_values("watched_at", ascending=False)
+        .head(limit)
+    )
+    return recent_shows
 
 
 if __name__ == "__main__":
-    recent5 = get_recently_watched_movies(username="zafy4", limit=10)
+    recent5 = get_recently_watched(username="zafy4", limit=10, media_type="movie")
     print("Most Recently Watched Movies:\n", recent5)
