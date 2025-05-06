@@ -113,12 +113,10 @@ def fetch_plex_list(media_type="Movies"):
 
 class Model():
     def build_features(self, df):
-        # MultiLabelBinarizer on pure Python lists
         G = MultiLabelBinarizer().fit_transform(df["genres"].tolist())
         C = MultiLabelBinarizer().fit_transform(df["cast"].tolist())
         D = MultiLabelBinarizer().fit_transform(df["directors"].tolist())
 
-        # Numeric features via .values → ensure ndarray
         runtimes = df["runtime"].fillna(0).astype(float).values
         votes    = df["vote"].fillna(0).astype(float).values
         years    = (
@@ -128,17 +126,14 @@ class Model():
         )
         nums = np.vstack([runtimes, votes, years]).T
 
-        # scale to [0,1]
         N = MinMaxScaler().fit_transform(nums)
 
-        # TF-IDF on overview (force list) + SVD → dense float array
         overviews = df["overview"].fillna("").tolist()
         Xtxt = TfidfVectorizer(max_features=2000, stop_words="english")\
             .fit_transform(overviews)
         Ttxt = TruncatedSVD(n_components=100, random_state=42)\
             .fit_transform(Xtxt)
 
-        # H-stack everything into one 2D float array
         X = np.hstack([G, C, D, N, Ttxt]).astype(float)
         return X
 
