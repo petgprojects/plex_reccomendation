@@ -1,44 +1,72 @@
 import pandas as pd
 import requests
+from datetime import datetime
 
-TAUTULLI_BASE_URL = "http://192.168.2.73:8181"  # Tautulli's base URL
-TAUTULLI_API_KEY   = "c0766a7cd7a24f73b8d110a118fed994"             # From Tautulli > Settings > General
+# Tautulli configuration
+TAUTULLI_BASE_URL = "http://192.168.2.73:8181"
+TAUTULLI_API_KEY   = "c0766a7cd7a24f73b8d110a118fed994"
 
-def get_tautulli_data(endpoint, **params):
-    """Helper to call Tautulli API with authentication"""
+
+def get_tautulli_data(cmd, **params):
+    """Helper to call the Tautulli API and return the JSON payload."""
     params["apikey"] = TAUTULLI_API_KEY
-    url = f"{TAUTULLI_BASE_URL}/api/v2?cmd={endpoint}"
-    return requests.get(url, params=params).json()
+    url = f"{TAUTULLI_BASE_URL}/api/v2?cmd={cmd}"
+    resp = requests.get(url, params=params)
+    resp.raise_for_status()
+    return resp.json()
 
-def get_most_watched_movies_by_count(user_id=None, limit=10):
-    # 1) resolve user_id if not given
+
+def get_recently_watched_movies(user_id=None, username="peterg236", limit=10):
+    """
+    Returns a DataFrame of the user's most recently watched movies (title, watched_at).
+    """
+    # 1) Resolve user_id if not provided
     if user_id is None:
-        users = get_tautulli_data("get_users")["response"]["data"]
-        user_id = next(u["user_id"] for u in users if u["username"]=="peterg236")
+        resp = get_tautulli_data("get_users")
+        users = resp.get("response", {}).get("data", resp)
+        if isinstance(users, dict):
+            users = [users]
+        user = next((u for u in users if u.get("username") == username), users[0])
+        user_id = user.get("user_id")
 
-    # 2) fetch up to N history rows for that user & media_type
+    # 2) Fetch history sorted by date descending
     resp = get_tautulli_data(
         "get_history",
         user_id=user_id,
         media_type="movie",
-        length=1000
-    )["response"]["data"]
-
-    # 3) build DataFrame
-    df = pd.DataFrame([{
-        "title":     e["title"],
-        "played_at": pd.to_datetime(e["watched_at"]),
-    } for e in resp])
-
-    # 4) group & sort by play count
-    top = (
-        df.groupby("title")
-          .size()
-          .reset_index(name="plays")
-          .sort_values("plays", ascending=False)
-          .head(limit)
+        length=limit,
+        order_column="date",
+        order_dir="desc"
     )
-    return top
+    data = resp.get("response", {}).get("data", resp)
+
+    # Unwrap v2 history payload: data may be dict with 'data' list, or list directly
+    if isinstance(data, dict) and "data" in data:
+        history = data["data"]
+    elif isinstance(data, list):
+        history = data
+    else:
+        history = []
+
+    # 3) Build list of recent watches
+    records = []
+    for entry in history:
+        ts = entry.get("date") or entry.get("timestamp") or entry.get("watched_at")
+        try:
+            watched_at = datetime.fromtimestamp(int(ts))
+        except Exception:
+            watched_at = None
+        title = entry.get("title") or entry.get("full_title")
+        records.append({
+            "title": title,
+            "watched_at": watched_at
+        })
+
+    # 4) Return DataFrame of the most recent N
+    df = pd.DataFrame(records)
+    return df.head(limit)
+
 
 if __name__ == "__main__":
-    print(get_most_watched_movies_by_count(limit=5))
+    recent5 = get_recently_watched_movies(username="zafy4", limit=10)
+    print("Most Recently Watched Movies:\n", recent5)
