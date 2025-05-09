@@ -4,16 +4,16 @@ from plexapi.video import Movie, Show
 from rec_engine import recommend_from_seeds
 from typing import List
 from tautulli import get_recently_watched
+from dotenv import load_dotenv
+import os
 
-BASE_URL       = "http://peterubuntuserver.ddns.net:32400"
-OWNER_TOKEN    = "ydWQy8X6StWBJVPHiLf2"        # any admin/owner token works
+load_dotenv()
+
+BASE_URL = os.getenv("PLEX_BASE_URL")
+PLEX_TOKEN = os.getenv("PLEX_TOKEN")
 PLAYLIST_TPL: str = "Fresh {kind} Recs for {name}"                     # for movies
 COLLECTION_TPL: str = "Fresh {kind} Recs for {name}"                   # for shows
 HOME_PROMOTE: bool = True                                   # put collection on Home row
-
-# account        = MyPlexAccount(token=OWNER_TOKEN)
-# owner_srv   = PlexServer(BASE_URL, OWNER_TOKEN)   # we need its machine ID
-# machine_id  = owner_srv.machineIdentifier
 
 
 def _pick_items(titles: list[str], plex_srv: PlexServer, kind: str):
@@ -48,7 +48,7 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
     """
     # 0) Owner wants a playlist too?  Their token is the one we already have.
     if username.lower() in {account.username.lower(), getattr(account, "title", "").lower()}:
-        return OWNER_TOKEN
+        return PLEX_TOKEN
 
     # 1) scan friends & home users – their "title" matches the display name
     for u in account.users():
@@ -114,9 +114,9 @@ def push_recs(username: str, seeds: List[str], kind: str):
         raise ValueError("kind must be 'movie' or 'tv'")
 
     # owner context to fetch machine ID & manage collections
-    owner_srv = PlexServer(BASE_URL, OWNER_TOKEN)
+    owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
     machine_id = owner_srv.machineIdentifier
-    account = MyPlexAccount(token=OWNER_TOKEN)
+    account = MyPlexAccount(token=PLEX_TOKEN)
 
     # connect as recipient user (for searches/playlists)
     user_token = _user_token(account, machine_id, username)
@@ -146,5 +146,5 @@ def get_name(username: str, account: MyPlexAccount):
 
 if __name__ == "__main__":
     recent_movies = get_recently_watched(username="zafy4", media_type="movie")["title"].tolist()
-    recent_tv = get_recently_watched(username="zafy4", media_type="episode")["title"].tolist()
-    push_recs("zafy4", recent_tv, "tv")
+    recent_tv = get_recently_watched(username="peterg236", media_type="episode")["title"].tolist()
+    push_recs("peterg236", recent_tv, "tv")

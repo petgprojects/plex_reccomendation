@@ -7,10 +7,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import MultiLabelBinarizer, MinMaxScaler
 from sklearn.neighbors import NearestNeighbors
+from dotenv import load_dotenv
+import os
 
-PLEX_BASE_URL = "http://peterubuntuserver.ddns.net:32400"
-PLEX_TOKEN    = "ydWQy8X6StWBJVPHiLf2"
-TMDB_API_KEY  = "ea023fa0879737d0cfd9ae3ca7365a6e"
+load_dotenv()
+
+PLEX_BASE_URL = os.getenv("PLEX_BASE_URL")
+PLEX_TOKEN = os.getenv("PLEX_TOKEN")
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+
 plex = PlexServer(PLEX_BASE_URL, PLEX_TOKEN)
 
 class Movie():
