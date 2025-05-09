@@ -1,11 +1,13 @@
 import pandas as pd
 import requests
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-# Tautulli configuration
-TAUTULLI_BASE_URL = "http://192.168.2.73:8181"
-TAUTULLI_API_KEY   = "c0766a7cd7a24f73b8d110a118fed994"
+load_dotenv()
 
+TAUTULLI_BASE_URL = os.getenv("TAUTULLI_BASE_URL")
+TAUTULLI_API_KEY = os.getenv("TAUTULLI_API_KEY")
 
 def get_tautulli_data(cmd, **params):
     """Helper to call the Tautulli API and return the JSON payload."""
