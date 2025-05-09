@@ -78,5 +78,5 @@ def get_recently_watched(user_id=None, username="peterg236", limit=10, media_typ
 
 
 if __name__ == "__main__":
-    recent5 = get_recently_watched(username="zafy4", limit=10, media_type="movie")
+    recent5 = get_recently_watched(limit=10, media_type="episode")
     print("Most Recently Watched Movies:\n", recent5)

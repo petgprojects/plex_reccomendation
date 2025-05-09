@@ -1,0 +1,6 @@
+numpy==2.2.5
+pandas==2.2.3
+plexapi==4.17.0
+Requests==2.32.3
+scikit_learn==1.6.1
+pyarrow=20.0.0
