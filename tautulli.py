@@ -7,11 +7,11 @@ import os
 load_dotenv()
 
 TAUTULLI_BASE_URL = os.getenv("TAUTULLI_BASE_URL")
-TAUTULLI_API_KEY = os.getenv("TAUTULLI_API_KEY")
+TAUTULLI_TOKEN = os.getenv("TAUTULLI_TOKEN")
 
 def get_tautulli_data(cmd, **params):
     """Helper to call the Tautulli API and return the JSON payload."""
-    params["apikey"] = TAUTULLI_API_KEY
+    params["apikey"] = TAUTULLI_TOKEN
     url = f"{TAUTULLI_BASE_URL}/api/v2?cmd={cmd}"
     resp = requests.get(url, params=params)
     resp.raise_for_status()
