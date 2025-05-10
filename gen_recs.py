@@ -14,7 +14,7 @@ load_dotenv()
 
 PLEX_BASE_URL = os.getenv("PLEX_BASE_URL")
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+TMDB_API_KEY = os.getenv("TMDB_TOKEN")
 
 plex = PlexServer(PLEX_BASE_URL, PLEX_TOKEN)
 
