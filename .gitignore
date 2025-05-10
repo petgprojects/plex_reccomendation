@@ -1,3 +1,4 @@
 reccomendations/*
 .env
 plex_rec_cache/*
+__pycache__/*
