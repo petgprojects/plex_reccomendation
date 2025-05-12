@@ -3,7 +3,7 @@ from datetime import datetime
 from tautulli import get_recently_watched
 from plex_playlist import push_recs
 
-LOG_PATH = pathlib.Path(os.getenv("TAUTULLI_WEBHOOK_LOG", "/var/log/tautulli_webhook.log"))
+LOG_PATH = pathlib.Path(os.getenv("TAUTULLI_WEBHOOK_LOG", "/plex_reccomendation/logs/webhook.log"))
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
