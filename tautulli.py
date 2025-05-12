@@ -70,6 +70,8 @@ def get_recently_watched(user_id=None, username="peterg236", limit=10, media_typ
 
     # 4) Return DataFrame of the most recent N
     df = pd.DataFrame(records)
+    if (df.empty):
+        return pd.DataFrame(columns=["title", "watched_at"])
     recent_shows = (
         df.groupby("title", as_index=False)["watched_at"]
         .max()
