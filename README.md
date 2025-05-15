@@ -55,3 +55,8 @@ You can integrate this service directly into Tautulli such that it will automati
 
 ### Contributing to the project
 Right now I haven't really thought about this, but if you want to contribute just make a branch off of main, and submit a PR when you're ready. I'll approve it when I get a chance.
+
+### Future Goals
+Right now I have two plans for this project:
+1. Clean up the code (a lot). It's a mess, I know. I didn't really go into this with a plan, so I'm going to try and spend some time cleaning it up and making it more readable and maintainable. 
+2. Full TMDB caching: I want to implement a feature where I can reccomend users movies/shows that aren't in their library, by indexing all of TMDB in my vector database.
