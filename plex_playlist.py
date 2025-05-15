@@ -28,7 +28,30 @@ def _pick_items(titles: list[str], plex_srv: PlexServer, kind: str):
     items = []
     for title in titles:
         hits = plex_srv.library.search(title=title)
+        
+        # If no hits, try splitting on colon and search first part
+        if not hits and ":" in title:
+            main_title = title.split(":")[0].strip()
+            hits = plex_srv.library.search(title=main_title)
+        
+        # If still no hits, try a more flexible search
         if not hits:
+            sections = plex_srv.library.sections()
+            movieSection = None
+            tvSection = None
+            for section in sections:
+                if section.type == "movie":
+                    movieSection = section
+                elif section.type == "show":
+                    tvSection = section
+            if kind == "movie":
+                hits = movieSection.searchMovies(title=title)
+            if kind == "tv":
+                hits = tvSection.searchShows(title)
+            hits = plex_srv.library.sections().search(filters={"title": title})
+            
+        if not hits:
+            print(f"Could not find: {title}")
             continue
 
         if kind == "movie":
@@ -61,20 +84,35 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
                        f"{[u.title for u in account.users()]}")
 
 #for movies
-def _push_movie_playlist(plex_u: PlexServer, titles: list[str], user_title: str):
+def _movie_section(plex_srv: PlexServer):
+    """Return the first library section of type 'movie'."""
+    return next(s for s in plex_srv.library.sections() if s.type == "movie")
+
+def _push_movie_collection(owner_srv: PlexServer, plex_u: PlexServer, titles: list[str], username: str, user_title: str):
     items = _pick_items(titles, plex_u, "movie")
     if not items:
         print("Movie titles not found in library – nothing added.")
         return
-    name = PLAYLIST_TPL.format(kind="Movie", name=user_title)
+    
+    movie_sec = _movie_section(owner_srv)  # collection must be created with owner perms
+    name = COLLECTION_TPL.format(kind="Movie", name=user_title)
+
     try:
-        pl = plex_u.playlist(name)
-        pl.removeItems(pl.items())
-        pl.addItems(items)
-        print(f"Playlist '{name}' updated ({len(items)} items).")
+        coll = movie_sec.collection(name)
+        coll.removeItems(coll.items())
+        coll.addItems(items)
+        print(f"Collection '{name}' updated ({len(items)} items).")
     except NotFound:
-        plex_u.createPlaylist(name, items=items)
-        print(f"Playlist '{name}' created ({len(items)} items).")
+        coll = movie_sec.createCollection(name, items=items)
+        print(f"Collection '{name}' created ({len(items)} items).")
+
+    # Promote on Home for just this user (if desired and supported)
+    if HOME_PROMOTE:
+        try:
+            hub = coll.visibility()
+            hub.updateVisibility(home=True, recommended=True, shared=False)
+        except Exception as exc:
+            print(f"Home promotion skipped: {exc}")
 
 #for tv
 def _tv_section(plex_srv: PlexServer):
@@ -130,7 +168,7 @@ def push_recs(username: str, seeds: List[str], kind: str):
         return
 
     if kind == "movie":
-        _push_movie_playlist(plex_u, recs["title"].tolist(), user_title)
+        _push_movie_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
     else:
         _push_tv_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
 
