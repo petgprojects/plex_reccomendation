@@ -7,7 +7,7 @@ from tautulli import get_recently_watched
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 BASE_URL = os.getenv("PLEX_BASE_URL")
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")

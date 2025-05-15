@@ -4,7 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 TAUTULLI_BASE_URL = os.getenv("TAUTULLI_BASE_URL")
 TAUTULLI_TOKEN = os.getenv("TAUTULLI_TOKEN")
