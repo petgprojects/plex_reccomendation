@@ -46,9 +46,16 @@ def _pick_items(titles: list[str], plex_srv: PlexServer, kind: str):
                     tvSection = section
             if kind == "movie":
                 hits = movieSection.searchMovies(title=title)
+                if not hits:
+                    hits = movieSection.searchMovies(title__icontains=title)
             if kind == "tv":
                 hits = tvSection.searchShows(title)
-            hits = plex_srv.library.sections().search(filters={"title": title})
+
+        if not hits:
+            hits = plex_srv.library.search(
+                title=title,
+                libtype="movie" if kind == "movie" else "show"
+            )
             
         if not hits:
             print(f"Could not find: {title}")
@@ -89,7 +96,7 @@ def _movie_section(plex_srv: PlexServer):
     return next(s for s in plex_srv.library.sections() if s.type == "movie")
 
 def _push_movie_collection(owner_srv: PlexServer, plex_u: PlexServer, titles: list[str], username: str, user_title: str):
-    items = _pick_items(titles, plex_u, "movie")
+    items = _pick_items(titles, owner_srv, "movie")
     if not items:
         print("Movie titles not found in library – nothing added.")
         return
@@ -121,7 +128,7 @@ def _tv_section(plex_srv: PlexServer):
 
 
 def _push_tv_collection(owner_srv: PlexServer, plex_u: PlexServer, titles: list[str], username: str, user_title: str):
-    items = _pick_items(titles, plex_u, "tv")
+    items = _pick_items(titles, owner_srv, "tv")
     if not items:
         print("Show titles not found in library – nothing added.")
         return
