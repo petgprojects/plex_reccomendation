@@ -14,10 +14,8 @@ fi
 
 if [ ! -d "$VENV_DIR/bin" ]; then
     PYTHON_DIR="$VENV_DIR/Scripts"
-    # "$VENV_DIR/Scripts/pip" install --no-cache-dir -r "$REQ_FILE"
 else
     PYTHON_DIR="$VENV_DIR/bin"
-    # "$VENV_DIR/bin/pip" install --no-cache-dir -r "$REQ_FILE"
 fi
 
 STAMP="$VENV_DIR/.__installed"
