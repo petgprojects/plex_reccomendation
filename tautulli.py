@@ -18,11 +18,14 @@ def get_tautulli_data(cmd, **params):
     return resp.json()
 
 
-def get_recently_watched(user_id=None, username="peterg236", limit=10, media_type="movie"):
+def get_recently_watched(user_id=None, username=None, limit=10, media_type="movie"):
     """
     media_type: one of 'movie' or 'episode' (for show)
     Returns a DataFrame of the user's most recently watched movies (title, watched_at).
     """
+    if username is None:
+        print("Needs a username")
+        return
     # 1) Resolve user_id if not provided
     if user_id is None:
         resp = get_tautulli_data("get_users")
