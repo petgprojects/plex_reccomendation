@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from plexapi.myplex import MyPlexAccount
 
-load_dotenv()
+load_dotenv(override=True)
 
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
 

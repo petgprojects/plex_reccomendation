@@ -7,7 +7,7 @@ from tautulli import get_recently_watched
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 BASE_URL = os.getenv("PLEX_BASE_URL")
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
@@ -145,6 +145,6 @@ def get_name(username: str, account: MyPlexAccount):
 
 
 if __name__ == "__main__":
-    recent_movies = get_recently_watched(username="zafy4", media_type="movie")["title"].tolist()
-    recent_tv = get_recently_watched(username="peterg236", media_type="episode")["title"].tolist()
-    push_recs("peterg236", recent_tv, "tv")
+    recent_movies = get_recently_watched(username="username", media_type="movie")["title"].tolist()
+    recent_tv = get_recently_watched(username="username", media_type="episode")["title"].tolist()
+    push_recs("username", recent_tv, "tv")
