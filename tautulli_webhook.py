@@ -52,7 +52,7 @@ def main():
     payload = _get_payload()
     log.info("Received payload: %s", json.dumps(payload)[:400])
 
-    if payload.get("event") not in ("watched", "playback_stop"):
+    if payload.get("event") not in ("watched", "playback_stop", "stop"):
         log.info("Ignoring event %s", payload.get("event"))
         return
 
