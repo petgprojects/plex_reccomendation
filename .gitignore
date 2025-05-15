@@ -3,3 +3,4 @@ reccomendations/*
 plex_rec_cache/*
 __pycache__/*
 plex_recs_env/*
+logs/*
