@@ -3,7 +3,7 @@
 This project is still a work in progress, however it does mostly work. 
 
 ### Installation
-1. pip install requirements.txt
+1. '''pip install requirements.txt'''
 2. Copy .env.template to .env
     1. Replace PLEX_BASE_URL with your Plex server
     2. Replace PLEX_TOKEN with your PLEX_X_TOKEN. 
