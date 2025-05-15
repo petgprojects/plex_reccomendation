@@ -33,7 +33,7 @@ To generate the playlists/collections in the first go, run ```python main.py```.
     1. Click their name
     2. Click "Restrictions"
     3. Click "Movies"
-    4. Set "ALLOW ONLY LABELS" to be the label you made for that user
+    4. Set "EXCLUDE LABELS" to be the label you made for all other users so they only see their own collections
     5. Repeat steps 3/4 for TV as well
 
 #### Integrating with Tautulli to automatically run
