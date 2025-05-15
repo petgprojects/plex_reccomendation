@@ -52,3 +52,6 @@ You can integrate this service directly into Tautulli such that it will automati
     1. Open the "Playback Stop" sub-menu, and paste ```--action {action} --media_type {media_type} --username {username} --title {title}``` into "Script Arguments"
     2. Open the "Watched" sub-menu, and paste ```--action {action} --media_type {media_type} --username {username} --title {title}```
 7. Click "Save" at the bottom right corner.
+
+### Contributing to the project
+Right now I haven't really thought about this, but if you want to contribute just make a branch off of main, and submit a PR when you're ready. I'll approve it when I get a chance.
