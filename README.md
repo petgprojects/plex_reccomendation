@@ -1,7 +1,8 @@
 **Plex Reccomendation Algorithm**
 
 This project is still a work in progress, however it does mostly work. 
-
+# IMPORTANT
+It looks like I was misunderstood on how collections work, I can't find a way to hide recommendations for all users without entirely hiding the collection from the Home screen. I'm looking into adding it to the user's watchlist instead
 ### Installation
 1. ```pip install requirements.txt```
 2. Copy .env.template to .env
