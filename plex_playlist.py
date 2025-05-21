@@ -1,6 +1,5 @@
 from plexapi.myplex import MyPlexAccount
-from plexapi.server  import PlexServer
-from plexapi.exceptions import BadRequest
+from plexapi.server  import PlexServer, NotFound
 from plexapi.video import Movie, Show
 from rec_engine import recommend_from_seeds
 from typing import List
@@ -84,64 +83,101 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
     # 1) scan friends & home users – their "title" matches the display name
     for u in account.users():
         if username.lower() in {u.title.lower(), getattr(u, "username", "").lower()}:
-            token = getattr(u, "authenticationToken", None) or u.get_token(machine_id)
+            token = u.get_token(machine_id) or getattr(u, "authenticationToken", None)
             if token:
                 return token
 
     raise RuntimeError(f"Cannot obtain token for user {username!r}. Available users: "
                        f"{[u.title for u in account.users()]}")
 
-def _get_account(owner_acc: MyPlexAccount, name: str) -> MyPlexAccount:
-    """Return a plex.tv-authenticated account for *name* (owner or Home user)."""
-    low = name.lower()
-    if low in (owner_acc.username.lower(), owner_acc.email.lower()):
-        return owner_acc                       # you
+#for movies
+def _movie_section(plex_srv: PlexServer):
+    """Return the first library section of type 'movie'."""
+    return next(s for s in plex_srv.library.sections() if s.type == "movie")
 
-    # Managed Plex-Home profiles
-    for u in owner_acc.users():
-        if low in (u.title.lower(), u.username.lower()):
-            return owner_acc.switchHomeUser(u)   # ⇢ account token
-
-    raise RuntimeError(f"No Plex Home user named {name!r}")
-
-def add_unique_to_watchlist(account, items):
-    unique = [itm for itm in items if not account.onWatchlist(itm)]
-    if not unique:
-        return 0
-    try:
-        account.addToWatchlist(unique)
-        return len(unique)
-    except BadRequest as exc:
-        print(f"Watch-list add failed: {exc}")
-        return 0
-
-def push_watchlist(username: str, seeds: list[str], kind: str):
-    owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
-    owner_acc = MyPlexAccount(token=PLEX_TOKEN)
-
-    friend_acc = _get_account(owner_acc, username)
-
-    items = _pick_items(seeds, owner_srv, kind)
+def _push_movie_collection(owner_srv: PlexServer, plex_u: PlexServer, titles: list[str], username: str, user_title: str):
+    items = _pick_items(titles, owner_srv, "movie")
     if not items:
-        print("No matches in library, nothing to add")
+        print("Movie titles not found in library – nothing added.")
         return
     
-    added = add_unique_to_watchlist(friend_acc, items)
-    print(f"Added {added} new titles to {username}'s watch-list")
+    movie_sec = _movie_section(owner_srv)  # collection must be created with owner perms
+    name = COLLECTION_TPL.format(kind="Movie", name=user_title)
 
+    try:
+        coll = movie_sec.collection(name)
+        coll.removeItems(coll.items())
+        coll.addItems(items)
+        print(f"Collection '{name}' updated ({len(items)} items).")
+    except NotFound:
+        coll = movie_sec.createCollection(name, items=items)
+        print(f"Collection '{name}' created ({len(items)} items).")
+
+    # Promote on Home for just this user (if desired and supported)
+    if HOME_PROMOTE:
+        try:
+            hub = coll.visibility()
+            hub.updateVisibility(home=True, recommended=True, shared=False)
+        except Exception as exc:
+            print(f"Home promotion skipped: {exc}")
+
+#for tv
+def _tv_section(plex_srv: PlexServer):
+    """Return the first library section of type 'show'."""
+    return next(s for s in plex_srv.library.sections() if s.type == "show")
+
+
+def _push_tv_collection(owner_srv: PlexServer, plex_u: PlexServer, titles: list[str], username: str, user_title: str):
+    items = _pick_items(titles, owner_srv, "tv")
+    if not items:
+        print("Show titles not found in library – nothing added.")
+        return
+    
+    tv_sec = _tv_section(owner_srv)  # collection must be created with owner perms
+    name = COLLECTION_TPL.format(kind="TV", name=user_title)
+
+    try:
+        coll = tv_sec.collection(name)
+        coll.removeItems(coll.items())
+        coll.addItems(items)
+        print(f"Collection '{name}' updated ({len(items)} items).")
+    except NotFound:
+        coll = tv_sec.createCollection(name, items=items)
+        print(f"Collection '{name}' created ({len(items)} items).")
+
+    # Promote on Home for just this user (if desired and supported)
+    if HOME_PROMOTE:
+        try:
+            hub = coll.visibility()
+            hub.updateVisibility(home=True, recommended=True, shared=False)
+        except Exception as exc:
+            # older Plex servers / tokens may not support per‑user promotion
+            print(f"Home promotion skipped: {exc}")
 
 def push_recs(username: str, seeds: List[str], kind: str):
     if kind not in {"movie", "tv"}:
         raise ValueError("kind must be 'movie' or 'tv'")
+
+    # owner context to fetch machine ID & manage collections
+    owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
+    machine_id = owner_srv.machineIdentifier
+    account = MyPlexAccount(token=PLEX_TOKEN)
+
+    # connect as recipient user (for searches/playlists)
+    user_token = _user_token(account, machine_id, username)
+    plex_u = PlexServer(BASE_URL, user_token)
+    user_title = get_name(username, account)
 
     # build recommendations
     recs = recommend_from_seeds(seeds, kind)
     if recs.empty:
         print("No recommendations produced – nothing to update.")
         return
-    
-    #push to watchlist
-    push_watchlist(username, recs["title"].tolist(), kind)
+
+    if kind == "movie":
+        _push_movie_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
+    else:
+        _push_tv_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
 
 def get_name(username: str, account: MyPlexAccount):
     if (account.username == username):
@@ -154,6 +190,6 @@ def get_name(username: str, account: MyPlexAccount):
 
 
 if __name__ == "__main__":
-    recent_movies = get_recently_watched(username="zafy4", media_type="movie")["title"].tolist()
-    recent_tv = get_recently_watched(username="peterg236", media_type="episode")["title"].tolist()
-    push_recs("zafy4", recent_movies, "movie")
+    recent_movies = get_recently_watched(username="username", media_type="movie")["title"].tolist()
+    recent_tv = get_recently_watched(username="username", media_type="episode")["title"].tolist()
+    push_recs("username", recent_tv, "tv")
