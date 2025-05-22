@@ -17,15 +17,17 @@ It looks like I was misunderstood on how collections work, I can't find a way to
         2. Follow the instructions to create an API key, and paste that key beside TMDB_TOKEN in .env
     4. Copy your Tautulli information beside TAUTULLI_BASE_URL and TAUTULLI_TOKEN.
         1. Tautulli installation guides can be found on their Github repo: https://github.com/Tautulli/Tautulli?tab=readme-ov-file
+    5. If you want to use Plex Watchlists to store your recommendations, set WATCHLIST=TRUE.
+        1. Doing this requires that all of your users are in your Plex Home. Without this, it won't work.
 3. Add the repo to Tautulli's docker image:
     1. In the volumes section, add ```- /path/to/repo/plex_reccomendation:/config/plex_reccomendation```
 4. Have Tautulli use the script
 
 ### Using the service
 #### On first run
-To generate the playlists/collections in the first go, run ```python main.py```. This will generate playlists and collections for all your users based on what they recently watched. The playlists will hide for all the other users, but collections will be available for all users. To fix this, follow these steps:
+To generate the collections in the first go, run ```python main.py```. This will generate collections for all your users based on what they recently watched, if you didn't set ```WATCHLIST=TRUE``` in your .env. Collections will be available for all users. To fix this, follow these steps:
 
-1. In plex, go to your TV Shows library, and click "Collections".
+1. In plex, go to your TV Shows/Movies library, and click "Collections".
 2. At each Collection, hover over it and click the pencil icon.
 3. Click "Labels", and add a label representing the user the collection was made for (I like to just use the user's name)
 4. In the top right hand corner of Plex, click the "Wrench" icon (Settings)
