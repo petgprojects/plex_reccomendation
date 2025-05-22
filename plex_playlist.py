@@ -1,6 +1,7 @@
 from plexapi.myplex import MyPlexAccount
 from plexapi.server  import PlexServer, NotFound
 from plexapi.video import Movie, Show
+from plexapi.exceptions import BadRequest
 from rec_engine import recommend_from_seeds
 from typing import List
 from tautulli import get_recently_watched
@@ -11,6 +12,7 @@ load_dotenv(override=True)
 
 BASE_URL = os.getenv("PLEX_BASE_URL")
 PLEX_TOKEN = os.getenv("PLEX_TOKEN")
+USE_WATCHLIST = os.getenv("WATCHLIST", "False").lower() in ("true", 1)
 PLAYLIST_TPL: str = "Fresh {kind} Recs for {name}"                     # for movies
 COLLECTION_TPL: str = "Fresh {kind} Recs for {name}"                   # for shows
 HOME_PROMOTE: bool = True                                   # put collection on Home row
@@ -89,6 +91,44 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
 
     raise RuntimeError(f"Cannot obtain token for user {username!r}. Available users: "
                        f"{[u.title for u in account.users()]}")
+
+def _get_account(owner_acc: MyPlexAccount, name: str) -> MyPlexAccount:
+    """Return a plex.tv-authenticated account for *name* (owner or Home user)."""
+    low = name.lower()
+    if low in (owner_acc.username.lower(), owner_acc.email.lower()):
+        return owner_acc                       # you
+
+    # Managed Plex-Home profiles
+    for u in owner_acc.users():
+        if low in (u.title.lower(), u.username.lower()):
+            return owner_acc.switchHomeUser(u)   # ⇢ account token
+
+    raise RuntimeError(f"No Plex Home user named {name!r}")
+
+def add_unique_to_watchlist(account, items):
+    unique = [itm for itm in items if not account.onWatchlist(itm)]
+    if not unique:
+        return 0
+    try:
+        account.addToWatchlist(unique)
+        return len(unique)
+    except BadRequest as exc:
+        print(f"Watch-list add failed: {exc}")
+        return 0
+
+def push_watchlist(username: str, seeds: list[str], kind: str):
+    owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
+    owner_acc = MyPlexAccount(token=PLEX_TOKEN)
+
+    friend_acc = _get_account(owner_acc, username)
+
+    items = _pick_items(seeds, owner_srv, kind)
+    if not items:
+        print("No matches in library, nothing to add")
+        return
+    
+    added = add_unique_to_watchlist(friend_acc, items)
+    print(f"Added {added} new titles to {username}'s watch-list")
 
 #for movies
 def _movie_section(plex_srv: PlexServer):
@@ -174,10 +214,13 @@ def push_recs(username: str, seeds: List[str], kind: str):
         print("No recommendations produced – nothing to update.")
         return
 
-    if kind == "movie":
-        _push_movie_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
+    if (not USE_WATCHLIST):
+        if kind == "movie":
+            _push_movie_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
+        else:
+            _push_tv_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
     else:
-        _push_tv_collection(owner_srv, plex_u, recs["title"].tolist(), username, user_title)
+        push_watchlist(username, recs["title"].tolist(), kind)
 
 def get_name(username: str, account: MyPlexAccount):
     if (account.username == username):
@@ -190,6 +233,7 @@ def get_name(username: str, account: MyPlexAccount):
 
 
 if __name__ == "__main__":
-    recent_movies = get_recently_watched(username="username", media_type="movie")["title"].tolist()
-    recent_tv = get_recently_watched(username="username", media_type="episode")["title"].tolist()
-    push_recs("username", recent_tv, "tv")
+    username = "username"
+    recent_movies = get_recently_watched(username=username, media_type="movie")["title"].tolist()
+    recent_tv = get_recently_watched(username=username, media_type="episode")["title"].tolist()
+    push_recs(username, recent_movies, "movie")
