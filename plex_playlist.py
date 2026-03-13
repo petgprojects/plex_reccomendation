@@ -2,10 +2,10 @@ from plexapi.myplex import MyPlexAccount
 from plexapi.server  import PlexServer, NotFound
 from plexapi.video import Movie, Show
 from plexapi.exceptions import BadRequest
-from rec_engine import recommend_from_seeds
 from typing import List
 from tautulli import get_recently_watched
 from dotenv import load_dotenv
+from plex_user_tokens import build_connect_url, find_account_record, normalize_identity
 import os
 
 load_dotenv(override=True)
@@ -16,6 +16,22 @@ USE_WATCHLIST = os.getenv("WATCHLIST", "False").lower() in ("true", 1)
 PLAYLIST_TPL: str = "Fresh {kind} Recs for {name}"                     # for movies
 COLLECTION_TPL: str = "Fresh {kind} Recs for {name}"                   # for shows
 HOME_PROMOTE: bool = True                                   # put collection on Home row
+
+
+class UserAuthenticationRequired(RuntimeError):
+    """Raised when a shared Plex user has not linked their account yet."""
+
+
+def _matches_identity(identity: str, *values: str | None) -> bool:
+    normalized_identity = normalize_identity(identity)
+    if not normalized_identity:
+        return False
+
+    return normalized_identity in {
+        normalize_identity(value)
+        for value in values
+        if normalize_identity(value)
+    }
 
 
 def _pick_items(titles: list[str], plex_srv: PlexServer, kind: str):
@@ -79,12 +95,12 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
       (what Tautulli calls *username* in its payload).
     """
     # 0) Owner wants a playlist too?  Their token is the one we already have.
-    if username.lower() in {account.username.lower(), getattr(account, "title", "").lower()}:
+    if _matches_identity(username, account.username, getattr(account, "title", None), getattr(account, "email", None)):
         return PLEX_TOKEN
 
     # 1) scan friends & home users – their "title" matches the display name
     for u in account.users():
-        if username.lower() in {u.title.lower(), getattr(u, "username", "").lower()}:
+        if _matches_identity(username, u.title, getattr(u, "username", None), getattr(u, "email", None)):
             token = u.get_token(machine_id) or getattr(u, "authenticationToken", None)
             if token:
                 return token
@@ -92,18 +108,45 @@ def _user_token(account: MyPlexAccount, machine_id: str, username: str) -> str:
     raise RuntimeError(f"Cannot obtain token for user {username!r}. Available users: "
                        f"{[u.title for u in account.users()]}")
 
-def _get_account(owner_acc: MyPlexAccount, name: str) -> MyPlexAccount:
-    """Return a plex.tv-authenticated account for *name* (owner or Home user)."""
-    low = name.lower()
-    if low in (owner_acc.username.lower(), owner_acc.email.lower()):
-        return owner_acc                       # you
+def _watchlist_auth_message(name: str, *, invalid_token: bool = False) -> str:
+    if invalid_token:
+        message = f"Stored Plex auth for user {name!r} is no longer valid."
+    else:
+        message = f"No linked Plex account is available for shared user {name!r}."
 
-    # Managed Plex-Home profiles
+    connect_url = build_connect_url(name)
+    if connect_url:
+        return f"{message} Ask them to visit {connect_url} to authorize watchlist updates."
+
+    return f"{message} Start auth_server.py and have them link their Plex account."
+
+
+def _get_watchlist_account(owner_acc: MyPlexAccount, name: str) -> MyPlexAccount:
+    """Return an account object for watchlist updates.
+
+    Home users can still be switched into directly. Regular shared users must
+    complete the external Plex auth flow once so we can reuse their account token.
+    """
+    if _matches_identity(name, owner_acc.username, getattr(owner_acc, "title", None), owner_acc.email):
+        return owner_acc
+
+    # Managed Plex-Home profiles can still be switched into without separate auth.
     for u in owner_acc.users():
-        if low in (u.title.lower(), u.username.lower()):
-            return owner_acc.switchHomeUser(u)   # ⇢ account token
+        if not _matches_identity(name, u.title, getattr(u, "username", None), getattr(u, "email", None)):
+            continue
+        try:
+            return owner_acc.switchHomeUser(u)
+        except Exception:
+            break
 
-    raise RuntimeError(f"No Plex Home user named {name!r}")
+    record = find_account_record(name)
+    if record:
+        try:
+            return MyPlexAccount(token=record["token"])
+        except Exception as exc:
+            raise UserAuthenticationRequired(_watchlist_auth_message(name, invalid_token=True)) from exc
+
+    raise UserAuthenticationRequired(_watchlist_auth_message(name))
 
 def add_unique_to_watchlist(account, items):
     unique = [itm for itm in items if not account.onWatchlist(itm)]
@@ -120,7 +163,7 @@ def push_watchlist(username: str, seeds: list[str], kind: str):
     owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
     owner_acc = MyPlexAccount(token=PLEX_TOKEN)
 
-    friend_acc = _get_account(owner_acc, username)
+    friend_acc = _get_watchlist_account(owner_acc, username)
 
     items = _pick_items(seeds, owner_srv, kind)
     if not items:
@@ -198,6 +241,11 @@ def push_recs(username: str, seeds: List[str], kind: str):
     if kind not in {"movie", "tv"}:
         raise ValueError("kind must be 'movie' or 'tv'")
 
+    # rec_engine imports gen_recs, which currently initializes Plex at import
+    # time. Keep the import here so auth/webhook endpoints can start without
+    # requiring an immediate Plex connection.
+    from rec_engine import recommend_from_seeds
+
     # owner context to fetch machine ID & manage collections
     owner_srv = PlexServer(BASE_URL, PLEX_TOKEN)
     machine_id = owner_srv.machineIdentifier
@@ -223,11 +271,11 @@ def push_recs(username: str, seeds: List[str], kind: str):
         push_watchlist(username, recs["title"].tolist(), kind)
 
 def get_name(username: str, account: MyPlexAccount):
-    if (account.username == username):
-        return username
+    if _matches_identity(username, account.username, getattr(account, "title", None), account.email):
+        return account.title or account.username
     for user in account.users():
-        if (username == user.username):
-            return user.title
+        if _matches_identity(username, user.username, user.title, getattr(user, "email", None)):
+            return user.title or user.username
     raise RuntimeError(f"Cannot obtain title for user {username!r}. Available users: "
                        f"{[u.username for u in account.users()]}")
 

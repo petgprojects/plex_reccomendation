@@ -1,0 +1,12 @@
+.env
+.git
+.gitignore
+.pytest_cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+plex_recs_env/
+plex_rec_cache/
+plex_user_tokens.json
