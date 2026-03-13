@@ -1,6 +1,6 @@
 import argparse
 from tautulli import get_recently_watched
-from plex_playlist import push_recs
+from plex_playlist import UserAuthenticationRequired, push_recs
 import os
 from dotenv import load_dotenv
 from plexapi.myplex import MyPlexAccount
@@ -19,17 +19,20 @@ def rec_all():
         username = user.username
         recent_movie = recently_watched(username, "movie")
         recent_tv = recently_watched(username, "episode")
-        
-        if (recent_movie):
-            push_recs(username=username, seeds=recent_movie, kind="movie")
-        if (recent_tv):
-            push_recs(username=username, seeds=recent_tv, kind="tv")
+
+        try:
+            if recent_movie:
+                push_recs(username=username, seeds=recent_movie, kind="movie")
+            if recent_tv:
+                push_recs(username=username, seeds=recent_tv, kind="tv")
+        except UserAuthenticationRequired as exc:
+            print(f"Skipping {username}: {exc}")
 
     recent_movie = recently_watched(account.username, "movie")
     recent_tv = recently_watched(account.username, "episode")
-    if (recent_movie):
+    if recent_movie:
         push_recs(username=account.username, seeds=recent_movie, kind="movie")
-    if (recent_tv):
+    if recent_tv:
         push_recs(username=account.username, seeds=recent_tv, kind="tv")
 if __name__ == "__main__":
     rec_all()

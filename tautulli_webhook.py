@@ -1,8 +1,6 @@
 import argparse
 import json, os, sys, pathlib, logging
-from datetime import datetime
-from tautulli import get_recently_watched
-from plex_playlist import push_recs
+from recommendation_webhook import process_tautulli_payload
 
 LOG_PATH = pathlib.Path(os.getenv("TAUTULLI_WEBHOOK_LOG", "/config/plex_reccomendation/logs/tautulli.log"))
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -50,24 +48,7 @@ def _get_payload() -> dict:
 
 def main():
     payload = _get_payload()
-    log.info("Received payload: %s", json.dumps(payload)[:400])
-
-    if payload.get("event") not in ("watched", "playback_stop", "stop"):
-        log.info("Ignoring event %s", payload.get("event"))
-        return
-
-    kind = "tv" if payload["media_type"] == "episode" else "movie"
-    user = payload["username"]
-    log.info("Processing: user=%s kind=%s", user, kind)
-
-    recent = get_recently_watched(username=user, media_type=payload["media_type"], limit=10)
-    if recent.empty:
-        log.warning("No recent items found for user=%s", user)
-        return
-
-    log.info("Recently watched: %s", recent["title"].tolist())
-    push_recs(user, recent["title"].tolist(), kind)
-    log.info("Finished push_recs for %s (%d items)", user, len(recent))
+    process_tautulli_payload(payload, log)
 
 if __name__ == "__main__":
     try:
@@ -101,4 +82,3 @@ if __name__ == "__main__":
 # except Exception as exc:
 #     log.exception("Webhook failed: %s", exc)
 #     raise
-
