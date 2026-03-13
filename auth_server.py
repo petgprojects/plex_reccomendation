@@ -125,6 +125,15 @@ def _external_base_url(handler: BaseHTTPRequestHandler) -> str:
     return f"{proto}://{host}".rstrip("/")
 
 
+def _app_url(handler: BaseHTTPRequestHandler, path: str, query: str | None = None) -> str:
+    base = _external_base_url(handler)
+    normalized_path = "/" + path.lstrip("/")
+    url = f"{base}{normalized_path}"
+    if query:
+        return f"{url}?{query}"
+    return url
+
+
 def _page(title: str, body: str, meta_refresh: str | None = None) -> bytes:
     refresh_html = ""
     if meta_refresh:
@@ -273,7 +282,7 @@ class AuthHandler(BaseHTTPRequestHandler):
         if connect_example:
             example_html = (
                 "<div class=\"panel\">"
-                "<p>Direct invite links work too. Replace the username and send this to a user:</p>"
+                "<p>Direct invite links are optional. Replace the username and send this to a user if you want the page pre-filled:</p>"
                 f"<p><code>{html.escape(connect_example)}</code></p>"
                 "</div>"
             )
@@ -281,7 +290,8 @@ class AuthHandler(BaseHTTPRequestHandler):
         body = f"""
 <h1>{html.escape(APP_NAME)} account linking</h1>
 <p>This page links a shared Plex account to your recommendation service. The user will authenticate on Plex's official sign-in page and then return here automatically.</p>
-<form action="/connect" method="get">
+<p>You can leave the username blank. The completed Plex login is enough for the service to identify the account.</p>
+<form action="{html.escape(_app_url(self, '/connect'), quote=True)}" method="get">
   <input name="username" placeholder="Plex username or display name (optional)">
   <button type="submit">Connect a Plex account</button>
 </form>
@@ -300,9 +310,8 @@ class AuthHandler(BaseHTTPRequestHandler):
             hint_html = f"<p><strong>Expected Plex account:</strong> <code>{html.escape(expected_username)}</code></p>"
 
         start_query = urlencode({"username": expected_username}) if expected_username else ""
-        start_url = "/start"
-        if start_query:
-            start_url = f"{start_url}?{start_query}"
+        start_url = _app_url(self, "/start", start_query if start_query else None)
+        back_url = _app_url(self, "/")
 
         body = f"""
 <h1>Connect your Plex account</h1>
@@ -310,7 +319,7 @@ class AuthHandler(BaseHTTPRequestHandler):
 {hint_html}
 <p>No manual token copying is required. After you finish signing into Plex, you will be sent back here and the link will be stored automatically.</p>
 <p><a class="button" href="{html.escape(start_url, quote=True)}">Continue to Plex</a></p>
-<p><a class="secondary" href="/">Back</a></p>
+<p><a class="secondary" href="{html.escape(back_url, quote=True)}">Back</a></p>
 """
         self._send_html(200, _page("Connect Plex account", body))
 
@@ -320,14 +329,15 @@ class AuthHandler(BaseHTTPRequestHandler):
 
         try:
             login = MyPlexPinLogin(headers=_plex_headers(), oauth=True)
-            callback_url = f"{_external_base_url(self)}/callback?{urlencode({'state': state})}"
+            callback_url = _app_url(self, "/callback", urlencode({"state": state}))
             auth_url = login.oauthUrl(forwardUrl=callback_url)
         except Exception as exc:  # pragma: no cover - requires live Plex auth service
+            back_url = _app_url(self, "/")
             body = f"""
 <h1>Unable to start Plex login</h1>
 <p>The auth session could not be created.</p>
 <div class="panel"><code>{html.escape(str(exc))}</code></div>
-<p><a class="secondary" href="/">Back</a></p>
+<p><a class="secondary" href="{html.escape(back_url, quote=True)}">Back</a></p>
 """
             self._send_html(500, _page("Unable to start Plex login", body))
             return
@@ -372,13 +382,14 @@ class AuthHandler(BaseHTTPRequestHandler):
 
         if not success or not pending.login.token:
             retry_query = urlencode({"state": state})
+            retry_url = _app_url(self, "/callback", retry_query)
             body = f"""
 <h1>Waiting for Plex</h1>
 <p>Your browser is back, but Plex has not finished handing off the token yet.</p>
 <p>This page will retry automatically.</p>
-<p><a class="button" href="/callback?{html.escape(retry_query, quote=True)}">Retry now</a></p>
+<p><a class="button" href="{html.escape(retry_url, quote=True)}">Retry now</a></p>
 """
-            self._send_html(200, _page("Waiting for Plex", body, meta_refresh=f"2; url=/callback?{retry_query}"))
+            self._send_html(200, _page("Waiting for Plex", body, meta_refresh=f"2; url={retry_url}"))
             return
 
         token = pending.login.token
@@ -386,22 +397,24 @@ class AuthHandler(BaseHTTPRequestHandler):
             account = MyPlexAccount(token=token)
         except Exception as exc:  # pragma: no cover - requires live Plex auth service
             _pop_pending_login(state)
+            back_url = _app_url(self, "/")
             body = f"""
 <h1>Token retrieval failed</h1>
 <p>Plex returned a token, but it could not be verified.</p>
 <div class="panel"><code>{html.escape(str(exc))}</code></div>
-<p><a class="secondary" href="/">Back</a></p>
+<p><a class="secondary" href="{html.escape(back_url, quote=True)}">Back</a></p>
 """
             self._send_html(500, _page("Token retrieval failed", body))
             return
 
         if pending.expected_username and not _account_matches_hint(account, pending.expected_username):
             _pop_pending_login(state)
+            back_url = _app_url(self, "/")
             body = f"""
 <h1>Wrong Plex account</h1>
 <p>This link expected <code>{html.escape(pending.expected_username)}</code>, but Plex returned <code>{html.escape(account.username)}</code>.</p>
 <p>Sign out of Plex in your browser and try again with the correct account.</p>
-<p><a class="secondary" href="/">Back</a></p>
+<p><a class="secondary" href="{html.escape(back_url, quote=True)}">Back</a></p>
 """
             self._send_html(409, _page("Wrong Plex account", body))
             return

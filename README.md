@@ -30,10 +30,11 @@ There is no popup inside Plex for this. Instead, users visit a normal web page h
 
 1. Start the auth server with `./auth_server.sh --host 0.0.0.0 --port 3187`
 2. If your users are remote, expose that port or reverse proxy it and set `PLEX_AUTH_BASE_URL` to the externally reachable URL before starting the server.
-3. Print per-user auth links with `./auth_server.sh --print-links`
-4. Send each user their link
-5. The user clicks the link, signs into Plex, approves access, and gets redirected back automatically
-6. Their account token is stored in `plex_user_tokens.json`, and future recommendation runs can update their Watchlist without Plex Home
+3. Send users to the public root URL, for example `https://plex.petergelgor.ca/recommendations/`
+4. They can click through and sign in without entering a username. The returned Plex account is enough for the service to identify them automatically.
+5. Optional: print pre-filled invite links with `./auth_server.sh --print-links` if you want a specific username hint in the URL
+6. The user signs into Plex, approves access, and gets redirected back automatically
+7. Their account token is stored in `plex_user_tokens.json`, and future recommendation runs can update their Watchlist without Plex Home
 
 If a shared user has not linked their account yet, webhook runs will skip Watchlist updates for that user and log a warning instead of crashing the whole run.
 
@@ -89,7 +90,7 @@ Webhook mode:
 4. Choose "Webhook"
 5. Set the webhook URL to your service, for example `http://plex-recommendation:3187/tautulli` inside Docker or your own proxied URL
 6. Enable the `Playback Stop` and `Watched` triggers
-7. Send a JSON body like `{"action":"{action}","media_type":"{media_type}","username":"{username}","title":"{title}"}`
+7. Send a JSON body like `{"action":"{action}","media_type":"{media_type}","username":"{username}"}`
 8. Save the agent
 
 Script mode:
